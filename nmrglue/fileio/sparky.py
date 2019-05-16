@@ -273,6 +273,8 @@ def read(filename):
         return read_2D(filename)
     if n == 3:
         return read_3D(filename)
+    if n == 4:
+        return read_4D(filename)
 
     raise ValueError("unknown dimentionality: %s" % n)
 
@@ -310,7 +312,7 @@ def read_lowmem(filename):
         return read_lowmem_2D(filename)
     if n == 3:
         return read_lowmem_3D(filename)
-
+    
     raise ValueError("unknown dimentionality: %s" % n)
 
 
@@ -378,29 +380,28 @@ def read_2D(filename):
     Read a 2D sparky file. See :py:func:`read` for documentation.
     """
     seek_pos = os.stat(filename).st_size
-    with open(filename, 'rb') as f:
+    f = open(filename, 'rb')
 
-        # read the file header
-        dic = fileheader2dic(get_fileheader(f))
+    # read the file header
+    dic = fileheader2dic(get_fileheader(f))
 
-        # check for file size mismatch
-        if seek_pos != dic["seek_pos"]:
-            warn('Bad file size in header %s vs %s' %
-                 (seek_pos, dic['seek_pos']))
+    # check for file size mismatch
+    if seek_pos != dic["seek_pos"]:
+        warn('Bad file size in header %s vs %s' % (seek_pos, dic['seek_pos']))
 
-        # read the axis headers...
-        for i in range(dic['naxis']):
-            dic["w" + str(i + 1)] = axisheader2dic(get_axisheader(f))
+    # read the axis headers...
+    for i in range(dic['naxis']):
+        dic["w" + str(i + 1)] = axisheader2dic(get_axisheader(f))
 
-        # read the data and untile
-        lenY = dic["w1"]["npoints"]
-        lenX = dic["w2"]["npoints"]
-        lentY = dic["w1"]["bsize"]
-        lentX = dic["w2"]["bsize"]
-        data = get_data(f)
-        data = untile_data2D(data, (lentY, lentX), (lenY, lenX))
+    # read the data and untile
+    lenY = dic["w1"]["npoints"]
+    lenX = dic["w2"]["npoints"]
+    lentY = dic["w1"]["bsize"]
+    lentX = dic["w2"]["bsize"]
+    data = get_data(f)
+    data = untile_data2D(data, (lentY, lentX), (lenY, lenX))
 
-        return dic, data
+    return dic, data
 
 
 def write_2D(filename, dic, data, overwrite=False):
@@ -437,31 +438,65 @@ def read_3D(filename):
     Read a 3D Sparky file. See :py:func:`read` for documentation.
     """
     seek_pos = os.stat(filename).st_size
-    with open(filename, 'rb') as f:
+    f = open(filename, 'rb')
 
-        # read the file header
-        dic = fileheader2dic(get_fileheader(f))
+    # read the file header
+    dic = fileheader2dic(get_fileheader(f))
 
-        # check for file size mismatch
-        if seek_pos != dic["seek_pos"]:
-            warn('Bad file size in header %s vs %s' %
-                 (seek_pos, dic['seek_pos']))
+    # check for file size mismatch
+    if seek_pos != dic["seek_pos"]:
+        warn('Bad file size in header %s vs %s' % (seek_pos, dic['seek_pos']))
 
-        # read the axis headers...
-        for i in range(dic['naxis']):
-            dic["w" + str(i + 1)] = axisheader2dic(get_axisheader(f))
+    # read the axis headers...
+    for i in range(dic['naxis']):
+        dic["w" + str(i + 1)] = axisheader2dic(get_axisheader(f))
 
-        # read the data and untile
-        lenZ = dic["w1"]["npoints"]
-        lenY = dic["w2"]["npoints"]
-        lenX = dic["w3"]["npoints"]
-        lentZ = dic["w1"]["bsize"]
-        lentY = dic["w2"]["bsize"]
-        lentX = dic["w3"]["bsize"]
-        data = get_data(f)
-        data = untile_data3D(data, (lentZ, lentY, lentX), (lenZ, lenY, lenX))
+    # read the data and untile
+    lenZ = dic["w1"]["npoints"]
+    lenY = dic["w2"]["npoints"]
+    lenX = dic["w3"]["npoints"]
+    lentZ = dic["w1"]["bsize"]
+    lentY = dic["w2"]["bsize"]
+    lentX = dic["w3"]["bsize"]
+    data = get_data(f)
+    data = untile_data3D(data, (lentZ, lentY, lentX), (lenZ, lenY, lenX))
 
-        return dic, data
+    return dic, data
+
+def read_4D(filename):
+    """
+    Read a 4D Sparky file. See :py:func:`read` for documentation.
+    """
+    seek_pos = os.stat(filename).st_size
+    f = open(filename, 'rb')
+
+    # read the file header
+    dic = fileheader2dic(get_fileheader(f))
+
+    # check for file size mismatch
+    if seek_pos != dic["seek_pos"]:
+        warn('Bad file size in header %s vs %s' % (seek_pos, dic['seek_pos']))
+
+    # read the axis headers...
+    for i in range(dic['naxis']):
+        dic["w" + str(i + 1)] = axisheader2dic(get_axisheader(f))
+
+    # read the data and untile
+    lenA = dic["w1"]["npoints"]
+    lenZ = dic["w2"]["npoints"]
+    #lenY = dic["w3"]["npoints"] 
+    #### BRUTFORCE!!!
+    lenY = 128
+    #lenX = dic["w4"]["npoints"]
+    lenX = 352
+    lentA = dic["w1"]["bsize"]
+    lentZ = dic["w2"]["bsize"]
+    lentY = dic["w3"]["bsize"]
+    lentX = dic["w4"]["bsize"]
+    data = get_data(f)
+    data = untile_data4D(data, (lentA, lentZ, lentY, lentX), (lenA, lenZ, lenY, lenX))
+
+    return dic, data
 
 
 def write_3D(filename, dic, data, overwrite=False):
@@ -1208,6 +1243,67 @@ def untile_data3D(data, tile_size, data_size):
 
     return out[:lenZ, :lenY, :lenX]
 
+
+def untile_data4D(data, tile_size, data_size):
+    """
+    Rearrange 4D tiled/Sparky formatted data into standard format.
+
+    Parameters
+    ----------
+    data : 1D ndarray
+        Tiled/Sparky formatted 2D NMR data.
+    (lentA, lentZ, lentY, lentX) : tuple of ints
+        Size of tile
+    (lenA, lenZ, lenY, lenX) : tuple of ints
+        Size of NMR data.
+
+    Returns
+    -------
+    sdata : 4D ndarray
+        NMR data, untiled/standard format.
+
+    """
+    lentA, lentZ, lentY, lentX = tile_size
+    lenA, lenZ, lenY, lenX = data_size
+
+    # determind the number of tiles in data
+    ttX = int(np.ceil(lenX / float(lentX)))  # total tiles in X dim
+    ttY = int(np.ceil(lenY / float(lentY)))  # total tiles in Y dim
+    ttZ = int(np.ceil(lenZ / float(lentZ)))  # total tiles in Z dim
+    ttA = int(np.ceil(lenA / float(lentA)))  # total tiles in A dim
+    tt = ttX * ttY * ttZ * ttA
+
+    # calc some basic parameter
+    tsize = lentX * lentY * lentZ *lentA # number of points in one tile
+    t_tup = (lentA, lentZ, lentY, lentX)  # tile size tuple
+
+    # create an empty array to store file data
+    out = np.empty((ttA * lentA, ttZ * lentZ, ttY * lentY, ttX * lentX), dtype="float32")
+    for iA in range(int(ttA)):
+        for iZ in range(int(ttZ)):
+            for iY in range(int(ttY)):
+                for iX in range(int(ttX)):
+
+                    minX = iX * lentX
+                    maxX = (iX + 1) * lentX
+
+                    minY = iY * lentY
+                    maxY = (iY + 1) * lentY
+
+                    minZ = iZ * lentZ
+                    maxZ = (iZ + 1) * lentZ
+
+                    minA = iA * lentA
+                    maxA = (iA + 1) * lentA
+
+                    ntile = iA * ttZ * ttY * ttX + iZ * ttX * ttY + iY * ttX + iX
+                    minT = ntile * tsize
+                    maxT = (ntile + 1) * tsize
+
+                    out[minA:maxA, minZ:maxZ, minY:maxY, minX:maxX] =  \
+                        data[minT:maxT].reshape(t_tup)
+
+    return out[:lenA, :lenZ, :lenY, :lenX]
 
 # fileheader functions
 def get_fileheader(f):
